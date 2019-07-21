@@ -15,7 +15,8 @@
 # resolver:
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
-resolver: lts-7.0
+# resolver: lts-7.0
+resolver: lts-9.1
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -40,7 +41,8 @@ packages:
 # - pandoc
 - location:
     git: git@github.com:freiric/pandoc.git
-    commit: 0eb35145bb9913fdac4a1bf913390895b9d51d3d
+    commit: c0d7d2180ad58849649741a7ef60a5ccedfc9334
+    ## commit: 0eb35145bb9913fdac4a1bf913390895b9d51d3d
   extra-dep: true
 
 #    commit: 97aa212cd1e988c0d9fd3b0928c0d68a77fa867c
@@ -49,10 +51,19 @@ packages:
 # (e.g., acme-missiles-0.3)
 extra-deps: 
 - persistent-cereal-0.1.0
-- filestore-0.6.2
+- filestore-0.6.3.1
 - http-client-0.5.0
 - http-client-tls-0.3.0
 - doctemplates-0.1.0.2
+
+- hslua-0.8.0
+- skylighting-0.3.3
+- cmark-gfm-0.1.1
+#- QuickCheck-2.10.0.1
+#- tasty-quickcheck-0.9.1
+#- haddock-library-1.4.3
+- pandoc-types-1.17.1
+
 
 # Override default flag values for local packages and extra-deps
 flags: {}

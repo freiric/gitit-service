@@ -58,13 +58,20 @@ import qualified Text.Pandoc                   as P (Attr, Block (CodeBlock, Nul
                                                      readOrg, readRST,
                                                      readTextile,
                                                      readerExtensions,
-                                                     readerSmart, writeHtml,
+--                                                     readerSmart, writeHtml,
+                                                     writeHtml5,
                                                      writerHTMLMathMethod,
-                                                     writerHighlight,
-                                                     writerHtml5,
-                                                     writerWrapText)
+--                                                     writerHighlight,
+--                                                     writerHtml5,
+                                                     writerWrapText,
+                                                     PandocMonad
+                                                     )
 import qualified Text.Pandoc.Builder           as PB (text, toList)
 import qualified Text.Pandoc.Error             as PE (handleError)
+import qualified Text.Pandoc.Extensions        as EXT (enableExtension)
+import qualified Text.Pandoc.Class             as PdClass (runIO
+                                                          , runIOorExplode
+                                                          , PandocIO)
 import           Text.Pandoc.Shared            (stringify)
 import           Web.HttpApiData               (FromHttpApiData, parseUrlPiece)
 -- import Data.Attoparsec.ByteString
@@ -94,10 +101,10 @@ generateHtml mbrev pagePath = do
   let pagePathStr = pathForPage pagePath
   mbcont <- getRawContents pagePathStr mbrev
   case mbcont of
-              Just contents -> do
+              Just contents -> PdClass.runIOorExplode $ do
                           wikipage <- contentsToWikiPage pagePath contents
-                          let htmlContents = pageToHtml wikipage
-                          return  htmlContents
+                          htmlContents <- pageToHtml wikipage
+                          return htmlContents
               Nothing -> EX.throwIO err503 { errBody = "Sorry dear user. Page not found: "  `BSLC.append` BSLC.pack pagePathStr }
 
 -- instance CEB.Exception ServantErr
@@ -134,7 +141,7 @@ data GititToc = GititLink Int P.Attr [P.Inline] P.Target
                 --       lvl num   attributes       label    contents
                 deriving (Eq, Read, Show, Generic)
 
-contentsToWikiPage :: PagePath  -> BSL.ByteString -> IO WikiPage
+contentsToWikiPage :: PagePath  -> BSL.ByteString -> PdClass.PandocIO WikiPage
 contentsToWikiPage page contents = do
 --   plugins' <- getPlugins
 --  converter <- wikiLinksConverter (pageToPrefix page)
@@ -144,7 +151,7 @@ contentsToWikiPage page contents = do
       simpleTitle = simple_title conf
       converter = wikiLinksConverter (pageToPrefix page)
 --  foldM applyPlugin (contentToWikiPage' title contents converter defaultFormat simpleTitle) (tocPlugin : plugins')
-  return $ contentToWikiPage' title contents converter defaultFormat simpleTitle
+  contentToWikiPage' title contents converter defaultFormat simpleTitle
   where
     lastTextFromPage (PagePath ps) = last ps
     -- | Convert links with no URL to wikilinks.
@@ -157,9 +164,11 @@ contentsToWikiPage page contents = do
     pageToPrefix (PagePath []) = T.empty
     pageToPrefix (PagePath ps) = T.intercalate "/" $ init ps ++ [T.empty]
 
-contentToWikiPage' :: T.Text -> BSL.ByteString -> ([P.Inline] -> String) -> PageFormat -> Bool -> WikiPage
-contentToWikiPage' title contents converter defaultFormat simpleTitle =
-  WikiPage {
+contentToWikiPage' :: T.Text -> BSL.ByteString -> ([P.Inline] -> String) -> PageFormat -> Bool -> PdClass.PandocIO WikiPage
+contentToWikiPage' title contents converter defaultFormat simpleTitle = do
+  doc <- reader $ T.pack $ BSLU.toString b
+  let P.Pandoc _ blocks = sanitizePandoc $ addWikiLinks doc
+  return WikiPage {
              wpName        = title
            , wpFormat      = format
            , wpTOC         = toc
@@ -175,20 +184,20 @@ contentToWikiPage' title contents converter defaultFormat simpleTitle =
     (h,b) = stripHeader $ BSLC.lines contents
     metadata :: M.Map T.Text Value
     metadata = if BSLC.null h
-                  then M.empty
+               then M.empty
                   else MB.fromMaybe M.empty
                        $ decode $! BS.concat $ BSLC.toChunks h
     formatStr = case M.lookup "format" metadata of
                        Just (String s) -> s
                        _               -> ""
     format = MB.fromMaybe defaultFormat $ readPageFormat formatStr
-    readerOpts literate = P.def{ P.readerSmart = True
-                               , P.readerExtensions =
-                                 if literate
-                                    then SET.insert P.Ext_literate_haskell P.pandocExtensions
-                                    else P.pandocExtensions }
+    readerOpts literate = P.def{  -- P.readerSmart = True, 
+                               P.readerExtensions =
+                               if literate
+                                  then EXT.enableExtension P.Ext_literate_haskell P.pandocExtensions
+                                  else P.pandocExtensions }
     (reader, lhs) = case format of
-                      Markdown l -> (P.readMarkdown (readerOpts l), l)
+                      Markdown l -> (P.readMarkdown (readerOpts l) :: T.Text -> PdClass.PandocIO P.Pandoc, l)
                       Textile  l -> (P.readTextile (readerOpts l), l)
                       LaTeX    l -> (P.readLaTeX (readerOpts l), l)
                       RST      l -> (P.readRST (readerOpts l), l)
@@ -197,8 +206,6 @@ contentToWikiPage' title contents converter defaultFormat simpleTitle =
     fromBool (Bool t) = t
     fromBool _        = False
     toc = maybe False fromBool (M.lookup "toc" metadata)
-    doc = PE.handleError . reader $ BSLU.toString b
-    P.Pandoc _ blocks = sanitizePandoc $ addWikiLinks doc
 
     convertWikiLinks :: P.Inline -> P.Inline
     convertWikiLinks (P.Link attr ref ("", "")) = P.Link attr (linkTitle ref) (converter ref, "")
@@ -249,13 +256,13 @@ extractCategories metadata =
        Just (String t) -> T.words $ T.replace "," " " t
        _               -> []
 
-pageToHtml :: WikiPage ->  Html
+pageToHtml :: P.PandocMonad m => WikiPage ->  m Html
 pageToHtml wikiPage =
-  P.writeHtml P.def{
+  P.writeHtml5 P.def{
                P.writerWrapText = P.WrapNone
-             , P.writerHtml5 = True
-             , P.writerHighlight = True
-             , P.writerHTMLMathMethod = P.MathML Nothing
+--              , P.writerHtml5 = True
+             -- , P.writerHighlight = True
+             , P.writerHTMLMathMethod = P.MathML
              } $ P.Pandoc P.nullMeta (wpContent wikiPage)
 
 getRawContents :: FilePath
