@@ -16,12 +16,13 @@ import qualified Data.ByteString.Lazy.Char8    as BSLC
 import qualified Data.ByteString.Lazy.UTF8     as BSLU (toString)
 
 import qualified Control.Exception             as EX (handle, throw, throwIO)
-import qualified Control.Exception.Base        as CEB (Exception)
-import           Control.Monad                 (foldM, void, when)
-import qualified Control.Monad.Except          as MEX (throwError)
+-- import qualified Control.Exception.Base        as CEB (Exception)
+-- import           Control.Monad                 (foldM, void, when)
+-- import qualified Control.Monad.Except          as MEX (throwError)
 import           Control.Monad.IO.Class        (liftIO)
-import           Data.Aeson.TH
-import qualified Data.ByteString               as BS (ByteString, concat)
+-- import           Data.Aeson.TH
+import qualified Data.ByteString               as BS (--ByteString,
+  concat)
 import           Data.FileStore                (FileStore,
                                                 FileStoreError (NotFound),
                                                 RevisionId, gitFileStore,
@@ -29,22 +30,24 @@ import           Data.FileStore                (FileStore,
 import qualified Data.Map                      as M
 import qualified Data.Maybe                    as MB (fromMaybe, mapMaybe)
 import           Data.Monoid                   ((<>))
-import qualified Data.Set                      as SET
+-- import qualified Data.Set                      as SET
 import qualified Data.Text                     as T (Text, append, break, empty,
                                                      intercalate, pack, replace,
                                                      splitOn, toLower, unpack,
                                                      words)
 import           Data.Yaml
 import           GHC.Generics
-import           Network.HTTP.Media            ((//), (/:))
+-- import           Network.HTTP.Media            ((//), (/:))
 import           Network.HTTP.Types.URI        (urlEncode)
 import           Network.Wai
-import           Servant
+import qualified Servant                       as S
 import           Servant.HTML.Blaze
-import           System.FilePath               (joinPath, (</>))
-import           Text.Blaze                    (ToMarkup)
+import           System.FilePath               (joinPath,
+                                                --(</>)
+                                                )
+-- import           Text.Blaze                    (ToMarkup)
 import           Text.Blaze.Html               (Html)
-import           Text.Blaze.Html.Renderer.Utf8 (renderHtml)
+-- import           Text.Blaze.Html.Renderer.Utf8 (renderHtml)
 import           Text.HTML.SanitizeXSS         (sanitizeAttribute)
 import qualified Text.Pandoc                   as P (Attr, Block (CodeBlock, Null, RawBlock),
                                                      Extension (Ext_literate_haskell),
@@ -67,17 +70,18 @@ import qualified Text.Pandoc                   as P (Attr, Block (CodeBlock, Nul
                                                      PandocMonad
                                                      )
 import qualified Text.Pandoc.Builder           as PB (text, toList)
-import qualified Text.Pandoc.Error             as PE (handleError)
+-- import qualified Text.Pandoc.Error             as PE (handleError)
 import qualified Text.Pandoc.Extensions        as EXT (enableExtension)
-import qualified Text.Pandoc.Class             as PdClass (runIO
-                                                          , runIOorExplode
-                                                          , PandocIO)
+import qualified Text.Pandoc.Class             as PdClass (
+  -- runIO, 
+                                                            runIOorExplode
+                                                            , PandocIO)
 import           Text.Pandoc.Shared            (stringify)
 import           Web.HttpApiData               (FromHttpApiData, parseUrlPiece)
 -- import Data.Attoparsec.ByteString
 -- import Data.String.Conversions
 
-type API = Capture "page" PagePath :> Get '[HTML] Html
+type API = S.Capture "page" PagePath S.:> S.Get '[HTML] Html
 
 instance FromHttpApiData PagePath where
   -- | Parse URL path piece.
@@ -88,12 +92,12 @@ instance FromHttpApiData PagePath where
 --   fromText t = Just $ PagePath $ T.splitOn "/" t
 
 app :: Application
-app = serve api server
+app = S.serve api server
 
-api :: Proxy API
-api = Proxy
+api :: S.Proxy API
+api = S.Proxy
 
-server :: Server API
+server :: S.Server API
 server pagePath = liftIO $ generateHtml Nothing pagePath
 
 generateHtml :: Maybe RevisionId -> PagePath -> IO Html
@@ -105,7 +109,7 @@ generateHtml mbrev pagePath = do
                           wikipage <- contentsToWikiPage pagePath contents
                           htmlContents <- pageToHtml wikipage
                           return htmlContents
-              Nothing -> EX.throwIO err503 { errBody = "Sorry dear user. Page not found: "  `BSLC.append` BSLC.pack pagePathStr }
+              Nothing -> EX.throwIO S.err503 { S.errBody = "Sorry dear user. Page not found: "  `BSLC.append` BSLC.pack pagePathStr }
 
 -- instance CEB.Exception ServantErr
 
@@ -155,16 +159,18 @@ contentsToWikiPage page contents = do
   where
     lastTextFromPage (PagePath ps) = last ps
     -- | Convert links with no URL to wikilinks.
-    wikiLinksConverter :: T.Text -> ([P.Inline] -> String)
+    wikiLinksConverter :: T.Text -> ([P.Inline] -> T.Text)
     wikiLinksConverter prefix = do
 --       toMaster <- getRouteToParent
 --      toUrl <- lift getUrlRender
-       T.unpack . T.append prefix . T.pack . B.toString . urlEncode True . B.fromString . stringify
+       T.append prefix . T.pack . B.toString . urlEncode True . B.fromString . T.unpack . stringify
 
     pageToPrefix (PagePath []) = T.empty
     pageToPrefix (PagePath ps) = T.intercalate "/" $ init ps ++ [T.empty]
 
-contentToWikiPage' :: T.Text -> BSL.ByteString -> ([P.Inline] -> String) -> PageFormat -> Bool -> PdClass.PandocIO WikiPage
+-- instance conduit.MonadThrow PdClass.PandocIO
+
+contentToWikiPage' :: T.Text -> BSL.ByteString -> ([P.Inline] -> T.Text) -> PageFormat -> Bool -> PdClass.PandocIO WikiPage
 contentToWikiPage' title contents converter defaultFormat simpleTitle = do
   doc <- reader $ T.pack $ BSLU.toString b
   let P.Pandoc _ blocks = sanitizePandoc $ addWikiLinks doc
@@ -173,7 +179,7 @@ contentToWikiPage' title contents converter defaultFormat simpleTitle = do
            , wpFormat      = format
            , wpTOC         = toc
            , wpLHS         = lhs
-           , wpTitle       = PB.toList $ PB.text $ T.unpack title
+           , wpTitle       = PB.toList $ PB.text title
            , wpCategories  = extractCategories metadata
            , wpMetadata    = metadata
            , wpCacheable   = True
@@ -186,7 +192,7 @@ contentToWikiPage' title contents converter defaultFormat simpleTitle = do
     metadata = if BSLC.null h
                then M.empty
                   else MB.fromMaybe M.empty
-                       $ decode $! BS.concat $ BSLC.toChunks h
+                       $ decodeThrow $! BS.concat $ BSLC.toChunks h
     formatStr = case M.lookup "format" metadata of
                        Just (String s) -> s
                        _               -> ""
@@ -212,7 +218,7 @@ contentToWikiPage' title contents converter defaultFormat simpleTitle = do
     convertWikiLinks (P.Image attr ref ("", "")) = P.Image attr ref (converter ref, "")
     convertWikiLinks x = x
 
-    linkTitle [P.Str refStr] | simpleTitle = [P.Str $ T.unpack $ last . T.splitOn "/" $ T.pack refStr]
+    linkTitle [P.Str refStr] | simpleTitle = [P.Str $ last . T.splitOn "/" $ refStr]
     linkTitle x = x
 
     addWikiLinks :: P.Pandoc -> P.Pandoc
@@ -242,12 +248,12 @@ contentToWikiPage' title contents converter defaultFormat simpleTitle = do
         sanitizeInline (P.Link attr lab (src,tit)) = P.Link attr lab (sanitizeURI src,tit)
         sanitizeInline (P.Image attr alt (src,tit)) = P.Image attr alt (sanitizeURI src,tit)
         sanitizeInline x = x
-        sanitizeURI src = case sanitizeAttribute ("href", T.pack src) of
-                               Just (_,z) -> T.unpack z
+        sanitizeURI src = case sanitizeAttribute ("href", src) of
+                               Just (_,z) -> z
                                Nothing    -> ""
         sanitizeAttrs = MB.mapMaybe sanitizeAttr
-        sanitizeAttr (x,y) = case sanitizeAttribute (T.pack x, T.pack y) of
-                                  Just (w,z) -> Just (T.unpack w, T.unpack z)
+        sanitizeAttr (x,y) = case sanitizeAttribute (x, y) of
+                                  Just (w,z) -> Just (w, z)
                                   Nothing    -> Nothing
 
 extractCategories :: M.Map T.Text Value -> [T.Text]
@@ -285,11 +291,11 @@ pathForPageP pageExtension (PagePath pagepaths) =  joinPath (map T.unpack pagepa
 type PageExtension = FilePath
 
 getConfig :: GititConfig
-getConfig =  GititConfig { page_extension = ".page"
-                         , repository_path = "/home/freiric/Documents/Perso/Prod/Haskell/gitit2/wikidata"                                         
-                         , default_format = Markdown False
-                         , simple_title = True
-                         }
+getConfig = GititConfig { page_extension = ".page"
+                        , repository_path = "/home/freiric/Documents/Perso/Prod/Haskell/gitit2/wikidata"                                         
+                        , default_format = Markdown False
+                        , simple_title = True
+                        }
 
 -- | Configuration for a gitit wiki.
 data GititConfig = GititConfig{
@@ -297,20 +303,20 @@ data GititConfig = GititConfig{
        default_format         :: PageFormat               -- ^ Default format for wiki pages
      , repository_path        :: FilePath                 -- ^ Path to wiki
      , page_extension         :: FilePath                 -- ^ Extension for page files
-     , static_path            :: FilePath                 -- ^ Path of static dir
-     , use_mathjax            :: Bool                     -- ^ Link to mathjax script
-     , feed_days              :: Integer                  -- ^ Days back for feed entries
-     , feed_minutes           :: Integer                  -- ^ Minutes to cache feed before refresh
-     , pandoc_user_data       :: Maybe FilePath           -- ^ Pandoc userdata directory
-     , use_cache              :: Bool                     -- ^ Cache pages and files
-     , cache_dir              :: FilePath                 -- ^ Path to cache
-     , front_page             :: T.Text                     -- ^ Front page of wiki
-     , help_page              :: T.Text                     -- ^ Help page
-     , latex_engine           :: Maybe FilePath           -- ^ LaTeX engine to use for PDF export
      , simple_title           :: Bool                     -- ^ Hide directory structure for wikilinks? If True `[dir/subdir/mySubpage]()` rendered as mySubpage.
-     , toc_depth              :: Maybe Int                -- ^ Depth of table of contents
-     , extended_toc           :: Bool                     -- ^ Toc extends over subpage
-     , subpage_toc_in_content :: Bool               -- ^ Subpage extends to their Toc in the content
+     -- , static_path            :: FilePath                 -- ^ Path of static dir
+     -- , use_mathjax            :: Bool                     -- ^ Link to mathjax script
+     -- , feed_days              :: Integer                  -- ^ Days back for feed entries
+     -- , feed_minutes           :: Integer                  -- ^ Minutes to cache feed before refresh
+     -- , pandoc_user_data       :: Maybe FilePath           -- ^ Pandoc userdata directory
+     -- , use_cache              :: Bool                     -- ^ Cache pages and files
+     -- , cache_dir              :: FilePath                 -- ^ Path to cache
+     -- , front_page             :: T.Text                     -- ^ Front page of wiki
+     -- , help_page              :: T.Text                     -- ^ Help page
+     -- , latex_engine           :: Maybe FilePath           -- ^ LaTeX engine to use for PDF export
+     -- , toc_depth              :: Maybe Int                -- ^ Depth of table of contents
+     -- , extended_toc           :: Bool                     -- ^ Toc extends over subpage
+     -- , subpage_toc_in_content :: Bool               -- ^ Subpage extends to their Toc in the content
      }
 
 getFileStore :: FileStore

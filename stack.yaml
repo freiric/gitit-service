@@ -16,7 +16,9 @@
 #  name: custom-snapshot
 #  location: "./custom-snapshot.yaml"
 # resolver: lts-7.0
-resolver: lts-9.1
+# resolver: lts-9.1
+# resolver: lts-13.17
+resolver: lts-14.6
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -39,30 +41,51 @@ resolver: lts-9.1
 packages:
 - '.'
 # - pandoc
-- location:
-    git: git@github.com:freiric/pandoc.git
-    commit: c0d7d2180ad58849649741a7ef60a5ccedfc9334
-    ## commit: 0eb35145bb9913fdac4a1bf913390895b9d51d3d
-  extra-dep: true
+# - location:
+#     # git: git@github.com:freiric/pandoc.git
+#     git: git@github.com:jgm/pandoc.git
+#     # commit: c0d7d2180ad58849649741a7ef60a5ccedfc9334
+#     commit: 87ce1ffbd97f6cb2785f9fbf05f68d3185f50675
+#     ## commit: 0eb35145bb9913fdac4a1bf913390895b9d51d3d
+#     #extra-deps: true
 
 #    commit: 97aa212cd1e988c0d9fd3b0928c0d68a77fa867c
 
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
-extra-deps: 
+extra-deps:
+# - git: git@github.com:jgm/pandoc.git
+# #     # commit: c0d7d2180ad58849649741a7ef60a5ccedfc9334
+# #   commit: 87ce1ffbd97f6cb2785f9fbf05f68d3185f50675
+#   commit: 5484a6349b83afeab207a02eae16f693439bfa02
 - persistent-cereal-0.1.0
-- filestore-0.6.3.1
-- http-client-0.5.0
-- http-client-tls-0.3.0
-- doctemplates-0.1.0.2
+- filestore-0.6.3.4
+# - cmark-gfm-0.2.0
+# - hslua-1.0.3.1
+# - hslua-module-system-0.2.0
+# - http-client-tls-0.3.0
+# - ipynb-0.1
 
-- hslua-0.8.0
-- skylighting-0.3.3
-- cmark-gfm-0.1.1
+- pandoc-2.9.1
+
+- pandoc-types-1.20
+- texmath-0.12
+- haddock-library-1.8.0
+- skylighting-0.8.3
+- skylighting-core-0.8.3
+- regex-pcre-builtin-0.95.0.8.8.35
+- doclayout-0.2.0.1
+- emojis-0.1
+- jira-wiki-markup-1.0.0
+- HsYAML-0.2.0.0
+- HsYAML-aeson-0.2.0.0
+- doctemplates-0.8
+- pandoc-citeproc-0.16.4.1
+
 #- QuickCheck-2.10.0.1
 #- tasty-quickcheck-0.9.1
 #- haddock-library-1.4.3
-- pandoc-types-1.17.1
+# - pandoc-types-1.17.1
 
 
 # Override default flag values for local packages and extra-deps
