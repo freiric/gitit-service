@@ -111,8 +111,6 @@ generateHtml mbrev pagePath = do
                           return htmlContents
               Nothing -> EX.throwIO S.err503 { S.errBody = "Sorry dear user. Page not found: "  `BSLC.append` BSLC.pack pagePathStr }
 
--- instance CEB.Exception ServantErr
-
 -- | Path to a wiki page.  Page and page components can't begin with '_'.
 data PagePath = PagePath [T.Text] deriving (Show, Read, Eq)
 
@@ -164,11 +162,8 @@ contentsToWikiPage page contents = do
 --       toMaster <- getRouteToParent
 --      toUrl <- lift getUrlRender
        T.append prefix . T.pack . B.toString . urlEncode True . B.fromString . T.unpack . stringify
-
     pageToPrefix (PagePath []) = T.empty
     pageToPrefix (PagePath ps) = T.intercalate "/" $ init ps ++ [T.empty]
-
--- instance conduit.MonadThrow PdClass.PandocIO
 
 contentToWikiPage' :: T.Text -> BSL.ByteString -> ([P.Inline] -> T.Text) -> PageFormat -> Bool -> PdClass.PandocIO WikiPage
 contentToWikiPage' title contents converter defaultFormat simpleTitle = do
